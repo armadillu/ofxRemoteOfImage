@@ -13,6 +13,9 @@ void testApp::setup(){
 
 	// alloc the img we will be serving
 	servedImage.allocate(imgW, imgH, OF_IMAGE_GRAYSCALE);
+
+	server.setDesiredFramerate(60);
+	server.setNetworkProtocol(REMOTE_OF_IMAGE_TCP);
 	server.startServer(&servedImage);
 }
 

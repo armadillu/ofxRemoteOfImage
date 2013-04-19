@@ -7,7 +7,9 @@ void testApp::setup(){
 	ofSetFrameRate(60);
 	ofBackground(0);
 
-	client.connect(&receivedImage, "127.0.0.1");
+	client.setDesiredFramerate(60);
+	client.setNetworkProtocol(REMOTE_OF_IMAGE_TCP);
+	client.connect(&receivedImage, "10.0.0.109");
 	ofSetWindowShape(640, 480);
 }
 

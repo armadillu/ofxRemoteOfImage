@@ -14,14 +14,15 @@
 
 #include "ofxNetwork.h"
 
-#define OFX_REMOTE_OF_IMAGE_DEFAULT_PORT	20334
-#define MAX_MSG_PAYLOAD_UDP					4096
-#define MAX_MSG_PAYLOAD_TCP					4096
+#define OFX_REMOTE_OF_IMAGE_DEFAULT_PORT	45334
+#define MAX_MSG_PAYLOAD_UDP					2048
+#define MAX_MSG_PAYLOAD_TCP					1024
 #define BLOCKING							true
 #define SIZE_L								5
 #define STARTUP_MSG							"_::_"
 #define ACK_MSG								"OK"
 #define	ACK_MID_MSG							"!+!"
+#define	LOOP_MSG							"!L!"
 #define RECONNECT_INTERVAL					5000
 
 enum ofxRemoteOfImageMode{ REMOTE_OF_IMAGE_SERVER, REMOTE_OF_IMAGE_CLIENT };

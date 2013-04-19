@@ -14,11 +14,11 @@ ofxRemoteOfImage::ofxRemoteOfImage(){
 	udpConnection.SetSendBufferSize(MAX_MSG_PAYLOAD_UDP * UDPbuffer);
 	udpConnection.SetTimeoutReceive(1);
 	udpConnection.SetTimeoutSend(1);
-	debug = false;
+	debug = true;
 	img = NULL;
 	frameRate = 60;
 	connected = false;
-	protocol = REMOTE_OF_IMAGE_UDP;
+	//protocol = REMOTE_OF_IMAGE_UDP;
 	protocol = REMOTE_OF_IMAGE_TCP;
 }
 
@@ -34,7 +34,7 @@ void ofxRemoteOfImage::startServer(ofImage * image, int port_){
 		udpConnection.Bind(port);
 		udpConnection.SetNonBlocking(!BLOCKING);
 	}else{
-		bool ok = tcpServer.setup(port, true);
+		bool ok = tcpServer.setup(port, BLOCKING);
 		if (!ok) ofExit();
 	}
 	startThread();
@@ -53,7 +53,7 @@ void ofxRemoteOfImage::connect(ofImage * image, string host_, int port_){
 		udpConnection.Connect(host.c_str(), port);
 		udpConnection.SetNonBlocking(!BLOCKING);
 	}else{
-		connected = tcpClient.setup(host, port, true);
+		connected = tcpClient.setup(host, port, BLOCKING);
 		if (!connected) ofExit();
 	}
 	startThread();
@@ -62,6 +62,10 @@ void ofxRemoteOfImage::connect(ofImage * image, string host_, int port_){
 
 void ofxRemoteOfImage::setDesiredFramerate(float r){
 	frameRate = r;
+}
+
+void ofxRemoteOfImage::setNetworkProtocol(ofxRemoteOfImageNetworkProtocol p){
+	protocol = p;
 }
 
 void ofxRemoteOfImage::stop(){
@@ -163,6 +167,10 @@ void ofxRemoteOfImage::updateUDP(){
 
 		int w = atoi( ww );
 		int h = atoi( hh );
+		if (w == 0 || h == 0){
+			unlock();
+			return;
+		}
 		ofImageType imgType = (ofImageType)atoi(imgMode);
 		bpp = bytesPerPixel(imgType);
 		if(debug) printf("client received %d - %d (%s - %s) (%d)\n",w,h, ww, hh, bpp);
@@ -326,6 +334,7 @@ void ofxRemoteOfImage::updateTCP(){
 							}
 							//if(debug) printf("did Receive reminder of %d\n", reciv);
 
+							tcpClient.send(LOOP_MSG);
 						}
 					}
 				}
@@ -398,15 +407,17 @@ void ofxRemoteOfImage::updateTCP(){
 						remainder = 0; // to skip remainder part
 						break;
 					}
-					if(debug) printf("midAck: %s\n", midACK.c_str());
+					//if(debug) printf("midAck: %s\n", midACK.c_str());
 				}
 
 				if (remainder > 0){
-					//if(debug) printf("will send reminder of %d\n", reminder);
+					if(debug) printf("will send reminder of %d\n", remainder);
 					tcpServer.sendRawBytes( i, pix + numBytes - remainder, remainder);////////		>> DATA_REMAINDER
 				}
-
 			}
+
+			string loopMSG = tcpServer.receive(i);
+			if(debug) printf("loopMSG: %s\n", loopMSG.c_str());
 
 			unlock(); ///////////////////////////////////////////////////////////////////////////////////////
 
