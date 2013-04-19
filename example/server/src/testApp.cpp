@@ -12,24 +12,29 @@ void testApp::setup(){
 	ofSetWindowPosition(640 + 60, 10);
 
 	// alloc the img we will be serving
-	servedImage.allocate(imgW, imgH, OF_IMAGE_GRAYSCALE);
+	servedImage.allocate(imgW, imgH, OF_IMAGE_COLOR);
 
 	server.setDesiredFramerate(60);
 	server.setNetworkProtocol(REMOTE_OF_IMAGE_TCP);
 	server.startServer(&servedImage);
+
+	cam.initGrabber(imgW, imgH);
 }
 
 
 void testApp::update(){
 
+	cam.update();
 	server.begin(); //call begin() before editing the image, to avoid tearing when sending it to clients
 
-		unsigned char * pix = servedImage.getPixels();
-		for(int i = 0; i < imgW; i+= 1){
-			for(int j = 0; j < imgH; j+= 1){
-				pix[(j * imgW + i)] = (ofGetFrameNum() * 15 + i + j * 2 )%255;
-			}
-		}
+//		unsigned char * pix = servedImage.getPixels();
+//		for(int i = 0; i < imgW; i+= 1){
+//			for(int j = 0; j < imgH; j+= 1){
+//				pix[(j * imgW + i)] = (ofGetFrameNum() * 15 + i + j * 2 )%255;
+//			}
+//		}
+
+		memcpy( servedImage.getPixels(), cam.getPixels(), imgW * imgH * 3);
 		servedImage.update(); //update the image after editing its piexls, to see results on screen
 
 	server.end(); //call end() after editing the image, to avoid tearing when sending it to clients

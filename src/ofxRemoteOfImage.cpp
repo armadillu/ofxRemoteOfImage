@@ -10,18 +10,18 @@
 
 ofxRemoteOfImage::ofxRemoteOfImage(){
 	int buffer = 10000;
-//	udpConnection.SetReceiveBufferSize(MAX_MSG_PAYLOAD_UDP * buffer);
-//	udpConnection.SetSendBufferSize(MAX_MSG_PAYLOAD_UDP * buffer);
+	udpConnection.SetReceiveBufferSize(MAX_MSG_PAYLOAD_UDP * buffer);
+	udpConnection.SetSendBufferSize(MAX_MSG_PAYLOAD_UDP * buffer);
 	udpConnection.SetTimeoutReceive(1);
 	udpConnection.SetTimeoutSend(1);
-	debug = true;
+	debug = false;
 	img = NULL;
 	frameRate = 60;
 	connected = false;
-//	tcpClient.TCPClient.SetReceiveBufferSize(MAX_MSG_PAYLOAD_TCP * buffer);
-//	tcpClient.TCPClient.SetSendBufferSize(MAX_MSG_PAYLOAD_TCP * buffer);
-//	tcpServer.TCPServer.SetReceiveBufferSize(MAX_MSG_PAYLOAD_TCP * buffer);
-//	tcpServer.TCPServer.SetSendBufferSize(MAX_MSG_PAYLOAD_TCP * buffer);
+	tcpClient.TCPClient.SetReceiveBufferSize(MAX_MSG_PAYLOAD_TCP * buffer);
+	tcpClient.TCPClient.SetSendBufferSize(MAX_MSG_PAYLOAD_TCP * buffer);
+	tcpServer.TCPServer.SetReceiveBufferSize(MAX_MSG_PAYLOAD_TCP * buffer);
+	tcpServer.TCPServer.SetSendBufferSize(MAX_MSG_PAYLOAD_TCP * buffer);
 	//protocol = REMOTE_OF_IMAGE_UDP;
 	protocol = REMOTE_OF_IMAGE_TCP;
 }
@@ -121,12 +121,9 @@ int ofxRemoteOfImage::send(ofxTCPManager & tcp, const unsigned char * bytes, uns
 	int dataSent = 0;
 	int lastTime = ofGetElapsedTimeMillis();
 
-	cout << " send " << numBytes << " bytes" << endl;
-
 	while (dataSent < numBytes) {
 
 		int result = tcp.Send((const char *) bytes + dataSent, numBytes - dataSent);
-		cout << "result: " << result << endl;
 
 		if( (result < 0 && errno != EAGAIN ) || result == 0 ){
 			if(debug) cout << "SEND ERROR : errno = " << errno << endl;
@@ -150,8 +147,6 @@ int ofxRemoteOfImage::receive(ofxTCPManager &manager, const unsigned char* buffe
 	int dataReceived = 0;
 	int result;
 	int lastTime = ofGetElapsedTimeMillis();
-
-	cout << " receive " << numBytes << " bytes" << endl;
 
 	while( dataReceived < numBytes ){
 
@@ -354,18 +349,13 @@ void ofxRemoteOfImage::updateTCP(){
 				return;
 			}
 
-			printf("format: %s (r1: %d)\n", format, r1);
+			if(debug) printf("format: %s (r1: %d)\n", format, r1);
 
 			vector<string> strElements = ofSplitString(string(format), STRING_DELIMITER);
 			int w = atoi( strElements[0].c_str() );
 			int h = atoi( strElements[1].c_str() );
 			ofImageType imgType = (ofImageType)atoi( strElements[2].c_str() );
 			bpp = bytesPerPixel( imgType );
-			printf("%d %d %d\n", w, h, bpp);
-
-//			int w = 640;
-//			int h = 480;
-//			ofImageType imgType = OF_IMAGE_GRAYSCALE;
 
 			if (img->getWidth() == w &&
 				img->getHeight() == h &&

@@ -19,4 +19,5 @@ class testApp : public ofBaseApp{
 		ofxRemoteOfImage server;
 		ofImage servedImage;
 
+		ofVideoGrabber cam;
 };
