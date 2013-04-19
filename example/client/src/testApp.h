@@ -16,7 +16,6 @@ class testApp : public ofBaseApp{
 		
 		void keyPressed(int key);
 
-
 		ofxRemoteOfImage client;
 		ofImage receivedImage;
 
