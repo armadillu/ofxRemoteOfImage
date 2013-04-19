@@ -1,6 +1,6 @@
 #include "testApp.h"
 
-//--------------------------------------------------------------
+
 void testApp::setup(){
 
 	ofSetVerticalSync(true);
@@ -9,68 +9,30 @@ void testApp::setup(){
 
 	client.connect(&receivedImage, "127.0.0.1");
 	ofSetWindowShape(640, 480);
-
-}
-
-//--------------------------------------------------------------
-void testApp::update(){
-
-	//client.update();
-	//ofSetWindowShape(receivedImage.getWidth(), receivedImage.getHeight());
 }
 
 
-//--------------------------------------------------------------
 void testApp::draw(){
-	client.begin();
-	client.updatePixels();
-	receivedImage.draw(0, 0);
-	client.end();
+
+	client.begin(); //call begin() before drawing the image, to avoid tearing
+
+		client.updatePixels();	//if you need to draw the image on screen, call updatePixels() before drawing it
+								//otherwise the texture will not be allocated to save on GPU time
+
+		receivedImage.draw(0, 0); //draw your image normally
+
+	client.end(); //call end() after drawing the image, to avoid tearing
 
 	ofDrawBitmapString("CLIENT " + ofToString(ofGetFrameRate(),1), 20, 20);
 }
 
-//--------------------------------------------------------------
+void testApp::exit(){
+	client.stop();
+}
+
+
+
 void testApp::keyPressed(int key){
 
 }
 
-//--------------------------------------------------------------
-void testApp::keyReleased(int key){
-
-}
-
-//--------------------------------------------------------------
-void testApp::mouseMoved(int x, int y){
-
-}
-
-//--------------------------------------------------------------
-void testApp::mouseDragged(int x, int y, int button){
-
-}
-
-//--------------------------------------------------------------
-void testApp::mousePressed(int x, int y, int button){
-
-}
-
-//--------------------------------------------------------------
-void testApp::mouseReleased(int x, int y, int button){
-
-}
-
-//--------------------------------------------------------------
-void testApp::windowResized(int w, int h){
-
-}
-
-//--------------------------------------------------------------
-void testApp::gotMessage(ofMessage msg){
-
-}
-
-//--------------------------------------------------------------
-void testApp::dragEvent(ofDragInfo dragInfo){ 
-
-}

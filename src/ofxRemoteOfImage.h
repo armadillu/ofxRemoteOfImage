@@ -6,20 +6,26 @@
 //
 //
 
-#ifndef __emptyExample__ofxRemoteOfImage__
-#define __emptyExample__ofxRemoteOfImage__
+#ifndef __ofxRemoteOfImage__
+#define __ofxRemoteOfImage__
 
 #include <iostream>
 #include "ofMain.h"
 
 #include "ofxNetwork.h"
 
-#define OFX_REMOTE_OF_IMAGE_DEFAULT_PORT	11999
-#define MAX_MSG_PAYLOAD						4096
+#define OFX_REMOTE_OF_IMAGE_DEFAULT_PORT	20334
+#define MAX_MSG_PAYLOAD_UDP					4096
+#define MAX_MSG_PAYLOAD_TCP					4096
 #define BLOCKING							true
 #define SIZE_L								5
+#define STARTUP_MSG							"_::_"
+#define ACK_MSG								"OK"
+#define	ACK_MID_MSG							"!+!"
+#define RECONNECT_INTERVAL					5000
 
 enum ofxRemoteOfImageMode{ REMOTE_OF_IMAGE_SERVER, REMOTE_OF_IMAGE_CLIENT };
+enum ofxRemoteOfImageNetworkProtocol{ REMOTE_OF_IMAGE_UDP, REMOTE_OF_IMAGE_TCP };
 
 class ofxRemoteOfImage: public ofThread{
 
@@ -27,21 +33,29 @@ public:
 
 	ofxRemoteOfImage();
 
-	//server
-	void startServer(ofImage * image, int port = OFX_REMOTE_OF_IMAGE_DEFAULT_PORT);
-	void imageChanged(); //flag image as updated, to send thorugh network
 
-	//client
+	//TCP OR UDP.
+	//UDP allows for one client per server only.
+	//apply same protocol to both server and client
+	void setNetworkProtocol(ofxRemoteOfImageNetworkProtocol p);
+
+	//how often the image will be sent through the net
+	void setDesiredFramerate(float fr); //apply same value to both client and server
+
+	// server /////////
+	void startServer(ofImage * image, int port = OFX_REMOTE_OF_IMAGE_DEFAULT_PORT);
+
+	// client ////////
 	void connect(ofImage * image, string host, int port = OFX_REMOTE_OF_IMAGE_DEFAULT_PORT);
 	void updatePixels();
 
-	//for both
-	void setFrameRate(float rate);
-	void begin(); // sync
-	void end();
+	//these 2 are meant to used together, to avoid tearing.
+	//You must use them both, in client AND server
+	void begin();	// call before editing img pixels in server, and before drawing in client
+	void end();		// call once you are done editing pixels in server, and after drawing in client
 
+	//call on exit, on both client and server.
 	void stop();
-
 
 private:
 
@@ -50,14 +64,28 @@ private:
 	void threadedFunction();
 	void update();
 
-	ofxRemoteOfImageMode mode;
-	ofxUDPManager udpConnection;
-	ofImage * img;
+	void updateTCP();
+	void updateUDP();
 
-	bool debug;
-	float frameRate;
+	ofxRemoteOfImageMode				mode; //server / client
+	ofxRemoteOfImageNetworkProtocol		protocol;	// TCP / UDP
 
-	char* data; // client
+	ofxUDPManager						udpConnection;
+	ofxTCPServer						tcpServer;
+	ofxTCPClient						tcpClient;
+
+	ofImage								*img;
+
+	bool								debug;
+	float								frameRate; //in fps
+	int									port;
+	string								host;
+
+	// TCP only //////
+	bool								connected;
+	float								counter;
+	int									connectTime;
+	int									deltaTime;
 
 };
 
