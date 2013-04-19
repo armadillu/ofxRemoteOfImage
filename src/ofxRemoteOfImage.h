@@ -14,9 +14,9 @@
 
 #include "ofxNetwork.h"
 
-#define OFX_REMOTE_OF_IMAGE_DEFAULT_PORT	45334
-#define MAX_MSG_PAYLOAD_UDP					2048
-#define MAX_MSG_PAYLOAD_TCP					1024
+#define OFX_REMOTE_OF_IMAGE_DEFAULT_PORT	45744
+#define MAX_MSG_PAYLOAD_UDP					512
+#define MAX_MSG_PAYLOAD_TCP					500
 #define BLOCKING							true
 #define SIZE_L								5
 #define STARTUP_MSG							"_::_"
@@ -24,6 +24,10 @@
 #define	ACK_MID_MSG							"!+!"
 #define	LOOP_MSG							"!L!"
 #define RECONNECT_INTERVAL					5000
+#define STRING_DELIMITER					"_"
+#define ZERO_PAD_LEN						6
+#define FORMAT_STR_LEN						(ZERO_PAD_LEN * 3 + 4)
+#define TIME_OUT_MILIS						1000
 
 enum ofxRemoteOfImageMode{ REMOTE_OF_IMAGE_SERVER, REMOTE_OF_IMAGE_CLIENT };
 enum ofxRemoteOfImageNetworkProtocol{ REMOTE_OF_IMAGE_UDP, REMOTE_OF_IMAGE_TCP };
@@ -64,6 +68,10 @@ private:
 	int bytesPerPixel(ofImageType type);
 	void threadedFunction();
 	void update();
+	int send(ofxTCPManager & tcp, const unsigned char * bytes, unsigned long numBytes);
+	int receive(ofxTCPManager & tcp, const unsigned char * buffer, unsigned long numBytes);
+
+	string zeroPadNumber(int num);
 
 	void updateTCP();
 	void updateUDP();

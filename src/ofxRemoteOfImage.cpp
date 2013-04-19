@@ -9,15 +9,19 @@
 #include "ofxRemoteOfImage.h"
 
 ofxRemoteOfImage::ofxRemoteOfImage(){
-	int UDPbuffer = 1000;
-	udpConnection.SetReceiveBufferSize(MAX_MSG_PAYLOAD_UDP * UDPbuffer);
-	udpConnection.SetSendBufferSize(MAX_MSG_PAYLOAD_UDP * UDPbuffer);
+	int buffer = 10000;
+//	udpConnection.SetReceiveBufferSize(MAX_MSG_PAYLOAD_UDP * buffer);
+//	udpConnection.SetSendBufferSize(MAX_MSG_PAYLOAD_UDP * buffer);
 	udpConnection.SetTimeoutReceive(1);
 	udpConnection.SetTimeoutSend(1);
 	debug = true;
 	img = NULL;
 	frameRate = 60;
 	connected = false;
+//	tcpClient.TCPClient.SetReceiveBufferSize(MAX_MSG_PAYLOAD_TCP * buffer);
+//	tcpClient.TCPClient.SetSendBufferSize(MAX_MSG_PAYLOAD_TCP * buffer);
+//	tcpServer.TCPServer.SetReceiveBufferSize(MAX_MSG_PAYLOAD_TCP * buffer);
+//	tcpServer.TCPServer.SetSendBufferSize(MAX_MSG_PAYLOAD_TCP * buffer);
 	//protocol = REMOTE_OF_IMAGE_UDP;
 	protocol = REMOTE_OF_IMAGE_TCP;
 }
@@ -34,7 +38,7 @@ void ofxRemoteOfImage::startServer(ofImage * image, int port_){
 		udpConnection.Bind(port);
 		udpConnection.SetNonBlocking(!BLOCKING);
 	}else{
-		bool ok = tcpServer.setup(port, BLOCKING);
+		bool ok = tcpServer.setup(port, false);
 		if (!ok) ofExit();
 	}
 	startThread();
@@ -53,12 +57,17 @@ void ofxRemoteOfImage::connect(ofImage * image, string host_, int port_){
 		udpConnection.Connect(host.c_str(), port);
 		udpConnection.SetNonBlocking(!BLOCKING);
 	}else{
-		connected = tcpClient.setup(host, port, BLOCKING);
+		connected = tcpClient.setup(host, port, true);
 		if (!connected) ofExit();
 	}
 	startThread();
 }
 
+string ofxRemoteOfImage::zeroPadNumber(int num){
+    std::ostringstream ss;
+    ss << std::setw( ZERO_PAD_LEN ) << std::setfill( '0' ) << num;
+    return ss.str();
+}
 
 void ofxRemoteOfImage::setDesiredFramerate(float r){
 	frameRate = r;
@@ -107,6 +116,68 @@ int ofxRemoteOfImage::bytesPerPixel(ofImageType type){
 	}
 }
 
+int ofxRemoteOfImage::send(ofxTCPManager & tcp, const unsigned char * bytes, unsigned long numBytes){
+
+	int dataSent = 0;
+	int lastTime = ofGetElapsedTimeMillis();
+
+	cout << " send " << numBytes << " bytes" << endl;
+
+	while (dataSent < numBytes) {
+
+		int result = tcp.Send((const char *) bytes + dataSent, numBytes - dataSent);
+		cout << "result: " << result << endl;
+
+		if( (result < 0 && errno != EAGAIN ) || result == 0 ){
+			if(debug) cout << "SEND ERROR : errno = " << errno << endl;
+			return -1;
+		}else{
+			if(result > 0){
+				dataSent += result;
+			}
+		}
+		if (ofGetElapsedTimeMillis() - lastTime > TIME_OUT_MILIS) {
+			if( TIME_OUT_MILIS > 0) cout << "SEND TIMEOUT" << endl;
+			return 0;
+		}
+	}
+	return 0;
+}
+
+
+int ofxRemoteOfImage::receive(ofxTCPManager &manager, const unsigned char* buffer, unsigned long numBytes){
+
+	int dataReceived = 0;
+	int result;
+	int lastTime = ofGetElapsedTimeMillis();
+
+	cout << " receive " << numBytes << " bytes" << endl;
+
+	while( dataReceived < numBytes ){
+
+		result = manager.Receive((char*)buffer + dataReceived, numBytes - dataReceived);
+		if( (errno != EAGAIN && result < 0) || result == 0 ){
+			if(debug) cout << "RECIEVE ERROR : errno = " << errno<< endl;
+			return -1;
+		}else{
+
+			if(result>0){
+				dataReceived += result;
+				if (dataReceived == numBytes){
+					dataReceived = 0;
+					return numBytes;
+				}
+			}
+		}
+		if (ofGetElapsedTimeMillis() - lastTime > TIME_OUT_MILIS) {
+			if(TIME_OUT_MILIS > 0 && debug) cout << "RECEIVE TIMEOUT" << endl;
+			return 0;
+		}
+	}
+	return dataReceived;
+}
+
+
 
 void ofxRemoteOfImage::threadedFunction(){
 
@@ -143,7 +214,6 @@ void ofxRemoteOfImage::end(){
 
 
 void ofxRemoteOfImage::updatePixels(){
-	//memcpy(img->getPixels(), (const char*) pix, (int)(img->getWidth() * img->getHeight() * bytesPerPixel(img->getPixelsRef().getImageType())) );
 	img->setUseTexture(true);
 	img->update();
 }
@@ -269,159 +339,91 @@ void ofxRemoteOfImage::updateTCP(){
 
 	int bpp = 1;
 
-	if(mode == REMOTE_OF_IMAGE_CLIENT){			// CLIENT
+	if(mode == REMOTE_OF_IMAGE_CLIENT){			// CLIENT ///////////////////////////////////////////////////////////////
 
 		if(connected){
 
-			tcpClient.send(STARTUP_MSG); //////////////////////////////////////////////////////////		<<	HI
-			string startMSG = tcpClient.receive(); ////////////////////////////////////////////////		>>	HI
-			if(debug) cout << "CLIENT got Start MSG: " << startMSG << endl;
+			lock(); ///////////////////////////////////////////////////////////////
 
-			if( STARTUP_MSG == startMSG ){
-
-				lock(); //////////////////////////////////////////////////////////////////////////////////////////////////
-				
-				string ww = tcpClient.receive();	///////////////////////////////////////////////		<<	W
-				if(debug) cout << "ww: " << ww <<endl;
-				if(ww.length() != 0){
-					
-					string hh = tcpClient.receive();	///////////////////////////////////////////		<<	H
-					if(debug) cout << "hh: " << hh <<endl;
-					if(hh.length() != 0){
-
-						string imgMode = tcpClient.receive();	///////////////////////////////////		<<	MODE
-						if(debug) cout << "imgMode: " << imgMode <<endl;
-						if(imgMode.length() != 0){
-
-							int w = atoi( ww.c_str() );
-							int h = atoi( hh.c_str() );
-							ofImageType imgType = (ofImageType)atoi(imgMode.c_str());
-							bpp = bytesPerPixel( imgType );
-
-							if (img->getWidth() == w &&
-								img->getHeight() == h &&
-								imgType == img->getPixelsRef().getImageType()
-								){
-								//OK
-							}else{ //server image changed dimensions!
-								img->clear();
-								img->setUseTexture(false);
-								img->allocate(w, h, imgType);
-								img->setUseTexture(true);
-							}
-
-							int numBytes = w * h * bpp;
-							char * pix = (char*)img->getPixels();
-							tcpClient.send(ACK_MSG);	///////////////////////////////////////////		>>	ACK
-
-							int maxSize = MAX_MSG_PAYLOAD_TCP;
-							if(maxSize > numBytes) maxSize = numBytes; // for very tiny images!
-							int loopTimes = floor((float)numBytes/maxSize);
-							int reminder = numBytes%maxSize;
-
-							if(debug) printf("will receive %d x %d + %d\n", loopTimes, maxSize, reminder);
-							int nr = 0;
-							for(int i = 0; i < loopTimes; i++){
-								nr = tcpClient.receiveRawBytes( pix + i * maxSize, maxSize);///////		<<	DATA_PART_N
-								//if(debug) cout << "got " << nr << " bytes" << endl;
-								if ( nr == 0 ) break;
-								tcpClient.send(ACK_MID_MSG);///////////////////////////////////////		>> MID_ACK
-							}
-
-							if (reminder > 0 && nr > 0){
-								//if(debug) printf("will Receive reminder of %d\n", reminder);
-								tcpClient.receiveRawBytes( pix + numBytes - reminder, reminder);///		<< DATA_REMAINDER
-							}
-							//if(debug) printf("did Receive reminder of %d\n", reciv);
-
-							tcpClient.send(LOOP_MSG);
-						}
-					}
-				}
-
-				unlock(); ///////////////////////////////////////////////////////////////////////////////////////////////
-
-			}else{
-				if(debug) cout << "bad STARTUP MSG" << endl;
-				if(!tcpClient.isConnected()){
-					if(debug) cout << "disconnected!" << endl;
-					connected = false;
-				}
+			char format[256];
+			int r1 = receive(tcpClient.TCPClient , (unsigned char*)format, FORMAT_STR_LEN);
+			if( r1 < FORMAT_STR_LEN){
+				cout << "err reading format" << endl;
+				connected = false;
+				unlock();
+				return;
 			}
+
+			printf("format: %s (r1: %d)\n", format, r1);
+
+			vector<string> strElements = ofSplitString(string(format), STRING_DELIMITER);
+			int w = atoi( strElements[0].c_str() );
+			int h = atoi( strElements[1].c_str() );
+			ofImageType imgType = (ofImageType)atoi( strElements[2].c_str() );
+			bpp = bytesPerPixel( imgType );
+			printf("%d %d %d\n", w, h, bpp);
+
+//			int w = 640;
+//			int h = 480;
+//			ofImageType imgType = OF_IMAGE_GRAYSCALE;
+
+			if (img->getWidth() == w &&
+				img->getHeight() == h &&
+				imgType == img->getPixelsRef().getImageType()
+				){
+				//OK
+			}else{ //server image changed dimensions!
+				img->clear();
+				img->setUseTexture(false);
+				img->allocate(w, h, imgType);
+				img->setUseTexture(true);
+			}
+
+			unsigned long numBytes = bpp * w * h;
+			if(debug) printf("will receive total of %lu bytes\n", numBytes);
+			int r = receive(tcpClient.TCPClient, (unsigned char*) img->getPixels(), numBytes);
+			if( r < numBytes){
+				cout << "err reading img data" << endl;
+				connected = false;
+			}
+
+			unlock(); ///////////////////////////////////////////////////////////////
+
 		}else{
 			//if we are not connected lets try and reconnect every 5 seconds
 			deltaTime = ofGetElapsedTimeMillis() - connectTime;
 
 			if( deltaTime > RECONNECT_INTERVAL ){
-				connected = tcpClient.setup(host, port);
+				connected = tcpClient.setup(host, port, true);
 				connectTime = ofGetElapsedTimeMillis();
 			}
 		}
 
-	}else{			//SERVER
+	}else{			// SERVER //////////////////////////////////////////////////////////////////////////////////////
 
 		for(int i = 0; i < tcpServer.getLastID(); i++){
 
-			if( !tcpServer.isClientConnected(i) ) continue; //clanup at some point?
+			if( !tcpServer.isClientConnected(i) ) continue; 
 
-			string port = ofToString( tcpServer.getClientPort(i) );
-			string ip   = tcpServer.getClientIP(i);
+			lock(); /////////////////////////////////////////////////////////////////
 
-			string startMSG = tcpServer.receive(i); ////////////////////////////////////////		<< HI
-			if(debug) cout << "SERVER got Start MSG: " << startMSG << endl;
+			int m = (int)img->getPixelsRef().getImageType();
+			bpp = bytesPerPixel(img->getPixelsRef().getImageType());
+			char * pix = (char*)img->getPixels();
+			int ww = (int)img->getWidth();
+			int hh = (int)img->getHeight();
+			unsigned long numBytes = ww * hh * bpp;
+
+			string format = zeroPadNumber(ww) + STRING_DELIMITER + zeroPadNumber(hh) + STRING_DELIMITER + zeroPadNumber(m) + STRING_DELIMITER; //
+			send(tcpServer.TCPConnections[i].TCPClient , (unsigned char*)format.c_str(), FORMAT_STR_LEN);
+
+			if(debug) printf("will sent total of %lu bytes\n", numBytes);
+			send(tcpServer.TCPConnections[i].TCPClient , img->getPixels(), numBytes);
+
+			unlock(); ///////////////////////////////////////////////////////////////
 			
-			if (startMSG.length() > 0 ){
-
-				tcpServer.send(i, STARTUP_MSG);	////////////////////////////////////////////		>>	HI
-
-				lock(); ////////////////////////////////////////////////////////////////////////////////////////
-
-				int m = (int)img->getPixelsRef().getImageType();
-				bpp = bytesPerPixel(img->getPixelsRef().getImageType());
-				char * pix = (char*)img->getPixels();
-				int numBytes = img->getWidth() * img->getHeight() * bpp;
-
-				string ww = ofToString((int)img->getWidth());
-				tcpServer.send(i, ww);	////////////////////////////////////////////////////		>>	W
-
-				string hh = ofToString((int)img->getHeight());
-				tcpServer.send(i, hh);	////////////////////////////////////////////////////		>>	H
-
-				tcpServer.send(i, ofToString(m));	////////////////////////////////////////		>>	MODE
-
-				string ack = tcpServer.receive(i);	////////////////////////////////////////		<<	ACK
-				if(debug) cout << "ack: " << ack << endl;
-				if ( ack.length() == 0 ) continue;
-
-				int maxSize = MAX_MSG_PAYLOAD_TCP; //udpConnection.GetMaxMsgSize();
-				if(maxSize > numBytes) maxSize = numBytes; // for very tiny images!
-				int loopTimes = floor((float)numBytes/maxSize);
-				int remainder = numBytes%maxSize;
-
-				if(debug) printf("will sent total of %d bytes\n", numBytes);
-				
-				for(int j = 0; j < loopTimes; j++){
-					tcpServer.sendRawBytes( i, pix + j * maxSize, maxSize);/////////////////		>>	DATA_PART_N
-					string midACK = tcpServer.receive(i);////////////////////////////////////		<<	MID_ACK
-					if ( midACK.length() == 0 ){
-						remainder = 0; // to skip remainder part
-						break;
-					}
-					//if(debug) printf("midAck: %s\n", midACK.c_str());
-				}
-
-				if (remainder > 0){
-					if(debug) printf("will send reminder of %d\n", remainder);
-					tcpServer.sendRawBytes( i, pix + numBytes - remainder, remainder);////////		>> DATA_REMAINDER
-				}
-			}
-
-			string loopMSG = tcpServer.receive(i);
-			if(debug) printf("loopMSG: %s\n", loopMSG.c_str());
-
-			unlock(); ///////////////////////////////////////////////////////////////////////////////////////
-
 		}
+		
 	}
 }
 
