@@ -1,6 +1,5 @@
 #pragma once
 
-#define SERVE false
 
 #include "ofMain.h"
 #include "ofxRemoteOfImage.h"
@@ -18,5 +17,6 @@ class testApp : public ofBaseApp{
 
 		ofxRemoteOfImage client;
 		ofImage receivedImage;
+
 
 };

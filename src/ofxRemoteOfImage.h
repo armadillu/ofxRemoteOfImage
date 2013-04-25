@@ -14,7 +14,7 @@
 
 #include "ofxNetwork.h"
 
-#define OFX_REMOTE_OF_IMAGE_DEFAULT_PORT	45544
+#define OFX_REMOTE_OF_IMAGE_DEFAULT_PORT	45644
 #define MAX_MSG_PAYLOAD_UDP					512
 #define MAX_MSG_PAYLOAD_TCP					500
 #define BLOCKING							true
